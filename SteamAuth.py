@@ -152,4 +152,41 @@ class SteamLogin:
         self.claim_cookie = f'sessionid={self.session_id}; steamLoginSecure={self.steamLoginSecure}'
 
 
+    def RefreshAccessToken(self, refresh_token):
+        try:
+            decoded_token = self.decodeToken(refresh_token)
+            steam_id64 = decoded_token.get("sub")
+
+            self.default_headers['cookie'] = f"steamRefresh_steam={steam_id64}%7C%7C{refresh_token}"
+
+            data = {
+            'nonce': refresh_token,
+            'sessionid':self.session_id,
+            'redir':'https://store.steampowered.com/login/?redir=&redir_ssl=1'
+            }
+
+            req = requests.post('https://login.steampowered.com/jwt/finalizelogin', data=data)
+            if req.status_code == 200:
+                key_response = req.json()
+                nonce = next(item['params']['nonce'] for item in key_response['transfer_info'] if 'steamcommunity.com/login/settoken' in item['url'])
+                auth  = next(item['params']['auth'] for item in key_response['transfer_info'] if 'steamcommunity.com/login/settoken' in item['url'])
+                
+                update_data = {
+                'nonce':nonce,
+                'auth':auth,
+                'steamID':steam_id64,
+                }
+
+                req = requests.post('https://steamcommunity.com/login/settoken', data=update_data, proxies=proxies)
+                if 'steamLoginSecure' in req.cookies:
+                    new_access_token = req.cookies['steamLoginSecure'].split('%7C%7C')[1]
+                    return True, new_access_token
+                else:
+                    return False, None
+
+            else:
+                return False, None
+        except: return False, None
+
+
 
