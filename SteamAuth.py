@@ -2,7 +2,6 @@ import requests
 import json
 import rsa
 import base64
-from random import choice
 
 class SteamLogin:
     def __init__(self, username: str, password: str, save_login_secure=False):
@@ -25,12 +24,32 @@ class SteamLogin:
         self.access_token = None
         self.refresh_token = None
 
+
+        self.default_headers =  {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "Accept-Encoding": "gzip, deflate, br, zstd",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Connection": "keep-alive",
+            "Host": "login.steampowered.com",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Upgrade-Insecure-Requests": "1",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+            "sec-ch-ua": '"Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
+        }
+
         self._startLogin()
 
 
     def _fetch_rsa_params(self, retry: int = 3) -> dict:
         response = self.session.get("https://api.steampowered.com/IAuthenticationService/GetPasswordRSAPublicKey/v1/?account_name=" + self.username)
+
         key_response = json.loads(response.text)
+
         for i in range(retry):
             try:
                 rsa_mod = int(key_response["response"]['publickey_mod'], 16)
@@ -56,8 +75,6 @@ class SteamLogin:
         }
         response = self.session.post("https://api.steampowered.com/IAuthenticationService/BeginAuthSessionViaCredentials/v1", data=data)
         key_response = json.loads(response.text)
-        print(key_response)
-        
 
         if '"confirmation_type":2' in response.text:
             self.steam_gaurd_type = 2
@@ -133,6 +150,7 @@ class SteamLogin:
 
         response = self.session.post('https://login.steampowered.com/jwt/finalizelogin', data=data)
         key_response = response.json()
+        
         nonce = next(item['params']['nonce']
                     for item in key_response['transfer_info']
                     if 'steamcommunity.com/login/settoken' in item['url'])
@@ -177,7 +195,7 @@ class SteamLogin:
                 'steamID':steam_id64,
                 }
 
-                req = requests.post('https://steamcommunity.com/login/settoken', data=update_data, proxies=proxies)
+                req = requests.post('https://steamcommunity.com/login/settoken', data=update_data)
                 if 'steamLoginSecure' in req.cookies:
                     new_access_token = req.cookies['steamLoginSecure'].split('%7C%7C')[1]
                     return True, new_access_token
@@ -187,6 +205,3 @@ class SteamLogin:
             else:
                 return False, None
         except: return False, None
-
-
-
